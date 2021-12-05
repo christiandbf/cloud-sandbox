@@ -1,0 +1,1 @@
+aws s3 sync ./assets s3://demo-cdk-assets-bucket

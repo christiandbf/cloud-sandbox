@@ -5,23 +5,24 @@
     "infrastructure": "bin/infrastructure.js"
   },
   "scripts": {
+    "local": "cdklocal",
+    "check": "npx npm-check-updates \"/aws-cdk/\"",
+    "upgrade": "npx npm-check-updates -u \"/aws-cdk/\" && npm install",
     "build": "tsc",
     "watch": "tsc -w",
-    "test": "jest",
     "cdk": "cdk"
   },
   "devDependencies": {
-    "@types/jest": "^26.0.10",
     "@types/node": "10.17.27",
     "aws-cdk": "2.0.0",
-    "jest": "^26.4.2",
-    "ts-jest": "^26.2.0",
+    "aws-cdk-local": "^1.65.8",
     "ts-node": "^9.0.0",
     "typescript": "~3.9.7"
   },
   "dependencies": {
     "aws-cdk-lib": "2.0.0",
     "constructs": "^10.0.0",
+    "dotenv": "^10.0.0",
     "source-map-support": "^0.5.16"
   }
 }
