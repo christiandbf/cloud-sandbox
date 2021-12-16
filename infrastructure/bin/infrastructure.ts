@@ -2,10 +2,10 @@
 import "dotenv/config";
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { WebsiteStack } from '../lib/website-stack';
+import { InfrastructureStack } from '../lib/infrastructure-stack';
 
 const app = new cdk.App();
 
-new WebsiteStack(app, 'InfrastructureStack', {
+new InfrastructureStack(app, 'InfrastructureStack', {
   env: { account: process.env.ACCOUNT, region: process.env.REGION },
 });
