@@ -7,8 +7,11 @@ import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as targets from "aws-cdk-lib/aws-route53-targets";
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as events from "aws-cdk-lib/aws-events";
+import * as eventTargets from "aws-cdk-lib/aws-events-targets";
 import { readFileSync } from "fs";
-import { ManagedPolicy, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 
 const userDataScript = readFileSync("./lib/user-data.sh", "utf8");
 
@@ -156,14 +159,14 @@ export class InfrastructureStack extends Stack {
       { os: ec2.OperatingSystemType.LINUX }
     );
 
-    const servicesEc2Role = new Role(this, "ServicesEc2Role", {
-      assumedBy: new ServicePrincipal("ec2.amazonaws.com"),
+    const servicesEc2Role = new iam.Role(this, "ServicesEc2Role", {
+      assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com"),
     });
     servicesEc2Role.addManagedPolicy(
-      ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")
+      iam.ManagedPolicy.fromAwsManagedPolicyName("AmazonSSMManagedInstanceCore")
     );
     servicesEc2Role.addManagedPolicy(
-      ManagedPolicy.fromAwsManagedPolicyName("CloudWatchLogsFullAccess")
+      iam.ManagedPolicy.fromAwsManagedPolicyName("CloudWatchLogsFullAccess")
     );
     backupBucket.grantReadWrite(servicesEc2Role);
 
@@ -207,6 +210,63 @@ export class InfrastructureStack extends Stack {
       zone,
       recordName: "api.reign.christiandbf.com",
       target: route53.RecordTarget.fromIpAddresses(servicesEc2ElasticIp.ref),
+    });
+
+    const workEc2 = new ec2.Instance(this, "WorkEc2", {
+      machineImage,
+      vpc,
+      instanceType: new ec2.InstanceType("t3.large"),
+      userData: ec2.UserData.custom(userDataScript),
+      securityGroup: sshSecurityGroup,
+      keyName: "work-ec2",
+      blockDevices: [
+        {
+          deviceName: "/dev/sda1",
+          volume: ec2.BlockDeviceVolume.ebs(128, {
+            encrypted: true,
+            volumeType: ec2.EbsDeviceVolumeType.GP3
+          }),
+        },
+      ],
+    });
+
+    const workEc2ElasticIp = new ec2.CfnEIP(this, "WorkEc2ElasticIp");
+    new ec2.CfnEIPAssociation(this, "WorkEc2ElasticIpAssociation", {
+      eip: workEc2ElasticIp.ref,
+      instanceId: workEc2.instanceId,
+    });
+
+    const stopLambda = new lambda.Function(this, "StopLambda", {
+      runtime: lambda.Runtime.PYTHON_3_9,
+      code: lambda.Code.fromAsset("Lambda"),
+      handler: "stop.lambda_handler",
+      environment: {
+        INSTANCE_ID: workEc2.instanceId,
+      },
+    });
+
+    stopLambda.role?.attachInlinePolicy(
+      new iam.Policy(this, "StopLambdaPolicy", {
+        statements: [
+          new iam.PolicyStatement({
+            actions: [
+              "ec2:StartInstances",
+              "ec2:StopInstances",
+              "ec2:DescribeInstances",
+            ],
+            resources: [
+              `arn:aws:ec2:${Stack.of(this).region}:${
+                Stack.of(this).account
+              }:instance/${workEc2.instanceId}`,
+            ],
+          }),
+        ],
+      })
+    );
+
+    new events.Rule(this, "StopLambdaEvent", {
+      schedule: events.Schedule.cron({ minute: "0", hour: "23" }),
+      targets: [new eventTargets.LambdaFunction(stopLambda)],
     });
   }
 }
