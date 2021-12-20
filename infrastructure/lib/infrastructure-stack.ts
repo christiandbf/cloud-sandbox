@@ -265,7 +265,7 @@ export class InfrastructureStack extends Stack {
     );
 
     new events.Rule(this, "StopLambdaEvent", {
-      schedule: events.Schedule.cron({ minute: "0", hour: "23" }),
+      schedule: events.Schedule.cron({ minute: "0", hour: "4" }),
       targets: [new eventTargets.LambdaFunction(stopLambda)],
     });
   }
