@@ -182,7 +182,7 @@ export class InfrastructureStack extends Stack {
       blockDevices: [
         {
           deviceName: "/dev/sda1",
-          volume: ec2.BlockDeviceVolume.ebs(8),
+          volume: ec2.BlockDeviceVolume.ebs(16),
         },
       ],
     });
